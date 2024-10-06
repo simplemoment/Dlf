@@ -1,24 +1,38 @@
-import sys
-import requests
-from PyQt6 import QtWidgets, QtCore
+from PyQt6 import QtWidgets, QtCore, QtGui
 from tqdm import tqdm
-import threading
-import time
+import sys, requests, time, os
 
+def rload(filepath):
+    if hasattr(sys, "_MEIPASS"): return os.path.join(sys._MEIPASS, filepath)
+    else: return os.path.join(os.path.abspath("."), filepath)
+
+kb = 1024
+mb = kb*kb
+
+class Variable:
+    def __init__(self, dif_value):
+        self.value = dif_value
+    def setValue(self, value):
+        self.value = value
+    def getValue(self):
+        return self.value
 
 class DownloadThread(QtCore.QThread):
     progress = QtCore.pyqtSignal(int)
     finished = QtCore.pyqtSignal()
 
-    def __init__(self, url, limit_speed=None):
+    def __init__(self, url, progbar, totalfs, limit_speed=None):
         super().__init__()
         self.url = url
+        self.progbar = progbar
+        self.totalfs = totalfs
         self.limit_speed = limit_speed
-        print('start')
 
     def run(self):
         response = requests.head(self.url)
         file_size = int(response.headers.get('content-length', 0))
+        self.totalfs.setValue(int(file_size))
+        self.progbar.setMaximum(int(file_size))
 
         response = requests.get(self.url, stream=True)
         filename = self.url.split('/')[-1]
@@ -39,15 +53,18 @@ class DownloadThread(QtCore.QThread):
 
 
 class DownloadApp(QtWidgets.QWidget):
+
     def __init__(self):
         super().__init__()
 
         self.download_thread = ""
+        self.total_fs = Variable(0)
 
         self.init_ui()
 
     def init_ui(self):
-        self.setWindowTitle('Downloader')
+        self.setWindowTitle('DLF')
+        self.setWindowIcon(QtGui.QIcon(rload('app.ico')))
         self.setGeometry(100, 100, 400, 200)
 
         self.url_label = QtWidgets.QLabel('URL:')
@@ -58,10 +75,12 @@ class DownloadApp(QtWidgets.QWidget):
         self.speed_input = QtWidgets.QSpinBox(self)
         self.speed_input.setValue(5)
 
-        self.download_button = QtWidgets.QPushButton('Download', self)
+        self.download_button = QtWidgets.QPushButton('Start dl', self)
         self.download_button.clicked.connect(self.start_download)
 
         self.progress_bar = QtWidgets.QProgressBar(self)
+        self.progress_bottom_label = QtWidgets.QLabel(self)
+        self.progress_bottom_label.setText("0/0 MB")
 
         layout = QtWidgets.QVBoxLayout()
         layout.addWidget(self.url_label)
@@ -70,6 +89,7 @@ class DownloadApp(QtWidgets.QWidget):
         layout.addWidget(self.speed_input)
         layout.addWidget(self.download_button)
         layout.addWidget(self.progress_bar)
+        layout.addWidget(self.progress_bottom_label, alignment=QtCore.Qt.AlignmentFlag.AlignCenter)
 
         self.setLayout(layout)
 
@@ -79,19 +99,23 @@ class DownloadApp(QtWidgets.QWidget):
 
         limit_speed = int(limit_speed) if limit_speed.isdigit() else None
 
-        self.download_thread = DownloadThread(url, (limit_speed*1024)*1024)
+        self.download_thread = DownloadThread(url, self.progress_bar, self.total_fs, (limit_speed*1024)*1024)
         self.download_thread.progress.connect(self.update_progress)
         self.download_thread.finished.connect(self.download_finished)
 
-        self.download_thread.start()
+        if url == "" or not "http" in url:QtWidgets.QMessageBox.warning(self, self.windowTitle(), "Enter url!!!")
+        else:self.download_thread.start()
 
     def update_progress(self, bytes_downloaded):
         self.progress_bar.setValue(self.progress_bar.value() + bytes_downloaded)
+        self.progress_bottom_label.setText(f"{round((self.progress_bar.value()+bytes_downloaded)/mb, 2)}/{round(self.total_fs.getValue()/mb, 2)} MB")
 
     def download_finished(self):
-        QtWidgets.QMessageBox.warning(self, 'Finished', 'Download finished!')
+        self.progress_bar.setValue(self.progress_bar.value()+1)
+        self.progress_bottom_label.setText(f"{round((self.progress_bar.value()+1)/mb, 2)}/{round(self.total_fs.getValue()/mb, 2)} MB")
+        QtWidgets.QMessageBox.information(self, self.windowTitle(), 'Download finished!')
 
-
+# END
 if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)
     downloader = DownloadApp()
