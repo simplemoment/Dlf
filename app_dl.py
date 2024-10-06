@@ -21,10 +21,11 @@ class DownloadThread(QtCore.QThread):
     progress = QtCore.pyqtSignal(int)
     finished = QtCore.pyqtSignal()
 
-    def __init__(self, url, progbar, totalfs, limit_speed=None):
+    def __init__(self, url, progbar, progbar_line, totalfs, limit_speed=None):
         super().__init__()
         self.url = url
         self.progbar = progbar
+        self.progbar_line = progbar_line
         self.totalfs = totalfs
         self.limit_speed = limit_speed
 
@@ -32,6 +33,8 @@ class DownloadThread(QtCore.QThread):
         response = requests.head(self.url)
         file_size = int(response.headers.get('content-length', 0))
         self.totalfs.setValue(int(file_size))
+        self.progbar_line.setText("0/0 MB")
+        self.progbar.setValue(0)
         self.progbar.setMaximum(int(file_size))
 
         response = requests.get(self.url, stream=True)
@@ -99,7 +102,7 @@ class DownloadApp(QtWidgets.QWidget):
 
         limit_speed = int(limit_speed) if limit_speed.isdigit() else None
 
-        self.download_thread = DownloadThread(url, self.progress_bar, self.total_fs, (limit_speed*1024)*1024)
+        self.download_thread = DownloadThread(url, self.progress_bar, self.progress_bottom_label, self.total_fs, (limit_speed*1024)*1024)
         self.download_thread.progress.connect(self.update_progress)
         self.download_thread.finished.connect(self.download_finished)
 
