@@ -74,6 +74,10 @@ class DownloadApp(QtWidgets.QWidget):
         self.url_input = QtWidgets.QLineEdit(self)
         self.url_input.setPlaceholderText("https://example.com/files/example.exe")
 
+        self.open_dl_path_button = QtWidgets.QPushButton(self)
+        self.open_dl_path_button.setText("Open folder")
+        self.open_dl_path_button.clicked.connect(self.open_dl_path)
+
         self.speed_label = QtWidgets.QLabel('Max Speed (MB/sec):')
         self.speed_input = QtWidgets.QSpinBox(self)
         self.speed_input.setValue(5)
@@ -118,6 +122,8 @@ class DownloadApp(QtWidgets.QWidget):
         self.progress_bottom_label.setText(f"{round((self.progress_bar.value()+1)/mb, 2)}/{round(self.total_fs.getValue()/mb, 2)} MB")
         QtWidgets.QMessageBox.information(self, self.windowTitle(), 'Download finished!')
 
+    def open_dl_path(self):
+        os.system(r'explorer "."')
 # END
 if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)
